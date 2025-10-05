@@ -1,0 +1,7 @@
+transformers 
+datasets 
+soundfile 
+accelerate 
+opensmile 
+librosa 
+bitsandbytes
