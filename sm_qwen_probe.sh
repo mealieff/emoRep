@@ -10,8 +10,16 @@
 #SBATCH --mail-type=ALL               # Email notifications for all job events
 #SBATCH --mail-user=mealieff@iu.edu   # Email address for notifications
 
-module load python/3.10 cuda/12.1
-source ~/projects/emoRep/.venv/bin/activate
+cd /N/slate/mealieff/emoRep/
 
-python qwen_probe_q1.py
+module load conda
+conda activate qwen_probe
+
+export HF_DATASETS_CACHE=/N/slate/mealieff/hf_cache/datasets
+export HF_MODULES_CACHE=/N/slate/mealieff/hf_cache/modules
+export HF_METRICS_CACHE=/N/slate/mealieff/hf_cache/metrics
+mkdir -p $HF_DATASETS_CACHE $HF_MODULES_CACHE $HF_METRICS_CACHE
+
+
+python qwen_probe.py
 
