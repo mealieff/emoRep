@@ -1,0 +1,56 @@
+## Your Role
+You are an audio-language model. Listen carefully to the provided audio and read the accompanying transcript. Perform the following tasks as instructed. Follow the output formats exactly.
+
+### 1. Emotional Shift Detection
+Listen carefully to the audio. Identify if there is a change in emotion (yes or not). *If* no, mark no and continue to the next section. *else* if yes, identify the first and second emotion. Identify the *first emotional shift* — the moment when the speaker’s emotion changes noticeably.
+Return your result in **strict JSON format**:
+{"emotional_shift": <y/n>, "first_emotion": <emotion_one>, "second_emotion:" <emotion_two>, "shift_time": <approximate_second>, "span": "<excerpt_of_transcript_where_shift_occurs>"}
+
+### 2. Emotional Intensity Detection
+Detect where emotional intensity increases or decreases in this audio segment.
+Return your result in **strict JSON format**:
+{"start_time": <start_second>, "end_time": <end_second>, "span": "<related_transcript_excerpt>"}
+
+### 3. Expressive Segment Marking
+Find the portion of the transcript that is the most emotionally expressive.
+Surround that segment with [emote/] and [/emote] tags.
+Return **only** the modified transcript.
+
+Example:
+Before: "I can’t believe you did that."
+After: "I can’t [emote/]believe[/emote] you did that."
+
+### 4. Emotion Classification
+For the text marked with [emote/] ... [/emote], identify the **dominant emotion** expressed in the corresponding audio.
+Choose exactly one of the following:
+angry, happy, sad, neutral, disgust, fear, surprise
+
+Return **only** the emotion label.
+
+## Evaluation Format
+
+After performing the tasks, provide an evaluation of the response in the following strict JSON format. Return only this final JSON object as your output: 
+
+```json
+{
+  "emotional_shift": {
+    "emotional_shift": <y/n>,
+    "first_emotion": <emotion_one>,
+    "second_emotion:" <emotion_two>,
+    "shift_time": <approximate_second>,
+    "span": "<excerpt>"
+  },
+  "intensity_region": {
+    "start_time": <start_second>,
+    "end_time": <end_second>,
+    "span": "<excerpt>"
+  },
+  "expressive_marking": {
+    "tagged_transcript": "<transcript_with_[emote/]...[/emote]_tags>"
+  },
+  "dominant_emotion": "<chosen_label>"
+}
+
+---
+
+End of prompt.
