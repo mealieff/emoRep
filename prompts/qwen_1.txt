@@ -1,42 +1,79 @@
 ## Your Role
-You are an audio-language model. Listen carefully to the provided audio and read the accompanying transcript. Perform the following tasks as instructed. Follow the output formats exactly.
+You are an audio-language model. Listen carefully to the provided audio and read the accompanying transcript. Analyze emotional content and follow the instructions exactly. All outputs must strictly follow JSON format for automated evaluation.
+
+---
 
 ### 1. Emotional Shift Detection
-Listen carefully to the audio. Identify if there is a change in emotion (yes or not). *If* no, mark no and continue to the next section. *else* if yes, identify the first and second emotion. Identify the *first emotional shift* — the moment when the speaker’s emotion changes noticeably.
-Return your result in **strict JSON format**:
-{"emotional_shift": <y/n>, "first_emotion": <emotion_one>, "second_emotion:" <emotion_two>, "shift_time": <approximate_second>, "span": "<excerpt_of_transcript_where_shift_occurs>"}
+Determine whether there is a noticeable change in emotion within the audio segment.
+
+- If there is **no** emotional change, return:
+  {"emotional_shift": "no"}
+
+- If there **is** a change, identify:
+  - the **first** emotion (before the shift),
+  - the **second** emotion (after the shift),
+  - the **approximate second** where the shift occurs,
+  - and the **transcript excerpt** where it happens.
+
+Return in strict JSON format:
+{
+  "emotional_shift": "yes",
+  "first_emotion": "<emotion_one>",
+  "second_emotion": "<emotion_two>",
+  "shift_time": <approximate_second>,
+  "span": "<excerpt_of_transcript_where_shift_occurs>"
+}
+
+---
 
 ### 2. Emotional Intensity Detection
-Detect where emotional intensity increases or decreases in this audio segment.
-Return your result in **strict JSON format**:
-{"start_time": <start_second>, "end_time": <end_second>, "span": "<related_transcript_excerpt>"}
+Detect where emotional intensity rises or falls within the segment.  
+Return in strict JSON format:
+{
+  "start_time": <start_second>,
+  "end_time": <end_second>,
+  "span": "<related_transcript_excerpt>"
+}
+
+---
 
 ### 3. Expressive Segment Marking
-Find the portion of the transcript that is the most emotionally expressive.
-Surround that segment with [emote/] and [/emote] tags.
-Return **only** the modified transcript.
+Identify the most emotionally expressive part of the transcript.  
+Mark it with `[emote/]` and `[/emote]` tags.
 
-Example:
-Before: "I can’t believe you did that."
-After: "I can’t [emote/]believe[/emote] you did that."
+Return **only** the modified transcript in JSON format:
+{
+  "tagged_transcript": "<transcript_with_[emote/]...[/emote]_markup>"
+}
 
-### 4. Emotion Classification
-For the text marked with [emote/] ... [/emote], identify the **dominant emotion** expressed in the corresponding audio.
-Choose exactly one of the following:
-angry, happy, sad, neutral, disgust, fear, surprise
+Example:  
+Before → "I can’t believe you did that."  
+After → "I can’t [emote/]believe[/emote] you did that."
 
-Return **only** the emotion label.
+---
 
-## Evaluation Format
+### 4. Dominant Emotion Classification
+For the [emote/] ... [/emote] span, determine the **dominant emotion** heard in the audio.  
+Choose exactly one:
+["angry", "happy", "sad", "neutral", "disgust", "fear", "surprise"]
 
-After performing the tasks, provide an evaluation of the response in the following strict JSON format. Return only this final JSON object as your output: 
+Return:
+{
+  "dominant_emotion": "<chosen_label>"
+}
 
-```json
+---
+
+### 5. Final Combined Output
+After completing all steps, return a **single JSON object** containing all sections.
+If no emotional shift is detected, set the `"emotional_shift"` field to `"no"` and omit unnecessary keys.
+
+Final format:
 {
   "emotional_shift": {
-    "emotional_shift": <y/n>,
-    "first_emotion": <emotion_one>,
-    "second_emotion:" <emotion_two>,
+    "emotional_shift": "<yes/no>",
+    "first_emotion": "<emotion_one>",
+    "second_emotion": "<emotion_two>",
     "shift_time": <approximate_second>,
     "span": "<excerpt>"
   },
