@@ -1,111 +1,82 @@
 import os
 import json
+import torch
+import librosa
+import soundfile as sf
 from pathlib import Path
-from datasets import load_dataset
-from transformers import pipeline, AutoProcessor, AutoModelForMultimodal
-import torchaudio
-import numpy as np
+import argparse
+from predict import Predictor  # Your AF3 Cog predictor
 
-# ---------------------------
-# Configuration
-# ---------------------------
-DATA_DIR = Path.home() / "datasets/seamless_interaction/improvised/dev"
-OUTPUT_DIR = Path.home() / "media/volume/data"
-PROMPT_FILE = Path("prompts/af3_prompt.txt")
+class SegmentAndAnalyze:
+    def __init__(self):
+        self.predictor = None
 
-# HF model to cache
-MODEL_NAME = "nvidia/audio-flamingo-3"
+    def setup(self):
+        """Initialize the AF3 Predictor."""
+        self.predictor = Predictor()
+        self.predictor.setup()
 
-# ---------------------------
-# Load prompt
-# ---------------------------
-with open(PROMPT_FILE, "r") as f:
-    PROMPT_TEXT = f.read()
+    def segment_audio(self, audio_path: str, silence_thresh: float = 40.0, min_silence_len: int = 1000):
+        """Segment audio into non-silent intervals using librosa."""
+        y, sr = librosa.load(audio_path, sr=None)
+        intervals = librosa.effects.split(y, top_db=silence_thresh, frame_length=min_silence_len)
+        segments = []
+        for start, end in intervals:
+            segment = y[start:end]
+            segment_path = f"{Path(audio_path).stem}_segment_{start}_{end}.wav"
+            sf.write(segment_path, segment, sr)
+            segments.append(segment_path)
+        return segments
 
-# ---------------------------
-# Load model and processor
-# ---------------------------
-print("Loading Flamingo-3 model...")
-processor = AutoProcessor.from_pretrained(MODEL_NAME, cache_dir=OUTPUT_DIR)
-model = AutoModelForMultimodal.from_pretrained(MODEL_NAME, cache_dir=OUTPUT_DIR)
-pipe = pipeline(
-    task="audio-to-text",
-    model=model,
-    feature_extractor=processor,
-    tokenizer=processor,
-    device="cuda" if torch.cuda.is_available() else "cpu"
-)
+    def safe_predict(self, audio_path: str, prompt: str, **kwargs):
+        """Call AF3 Predictor safely with plain Python arguments."""
+        return self.predictor.predict(
+            audio=audio_path,
+            prompt=prompt,
+            start_time=kwargs.get("start_time", None),
+            end_time=kwargs.get("end_time", None),
+            enable_thinking=kwargs.get("enable_thinking", False),
+            temperature=kwargs.get("temperature", 0.0),
+            max_length=kwargs.get("max_length", 0),
+            system_prompt=kwargs.get("system_prompt", "")
+        )
 
-# ---------------------------
-# Helper: load speaker segments
-# ---------------------------
-def load_speaker_segments(json_path):
-    """
-    Return a list of dicts: [{"speaker": ..., "start": ..., "end": ..., "text": ...}, ...]
-    Assumes JSON has 'segments' with speaker turn info.
-    """
-    with open(json_path, "r") as f:
-        data = json.load(f)
-    
-    segments = []
-    for seg in data.get("segments", []):
-        speaker = seg.get("speaker", "unknown")
-        start = seg.get("start", 0.0)
-        end = seg.get("end", 0.0)
-        text = seg.get("text", "")
-        segments.append({"speaker": speaker, "start": start, "end": end, "text": text})
-    return segments
+    def analyze_segments(self, segments: list, prompt: str):
+        """Analyze each audio segment using AF3."""
+        analyses = []
+        for segment_path in segments:
+            analysis = self.safe_predict(audio_path=segment_path, prompt=prompt)
+            analyses.append({"segment": segment_path, "analysis": analysis})
+        return analyses
 
-# ---------------------------
-# Helper: extract audio segment
-# ---------------------------
-def extract_audio_segment(wav_path, start, end):
-    waveform, sr = torchaudio.load(wav_path)
-    start_frame = int(start * sr)
-    end_frame = int(end * sr)
-    return waveform[:, start_frame:end_frame]
+    def predict(self, audio: str, prompt: str):
+        """Segment the audio and run AF3 analysis on each segment."""
+        segments = self.segment_audio(audio)
+        analyses = self.analyze_segments(segments, prompt)
+        return json.dumps(analyses, indent=2)
 
-# ---------------------------
-# Main processing loop
-# ---------------------------
-for file_prefix in sorted(DATA_DIR.glob("*/*.wav")):
-    wav_path = file_prefix
-    json_path = wav_path.with_suffix(".json")
-    
-    if not json_path.exists():
-        print(f"Skipping {wav_path}, no JSON found")
-        continue
 
-    segments = load_speaker_segments(json_path)
-    results = []
+def main():
+    parser = argparse.ArgumentParser(description="Segment audio and analyze with Audio Flamingo 3")
+    parser.add_argument("--audio", type=str, required=True, help="Path to input audio file")
+    parser.add_argument("--prompt", type=str, required=True, help="Path to prompt text file")
+    args = parser.parse_args()
 
-    for seg in segments:
-        audio_segment = extract_audio_segment(wav_path, seg["start"], seg["end"])
-        
-        # Convert waveform to float32 and CPU if needed
-        audio_segment = audio_segment.float().cpu()
-        
-        # Run Flamingo-3 audio reasoning
-        try:
-            output = pipe({
-                "text": PROMPT_TEXT,
-                "audio": audio_segment
-            })
-            # Pipe output may be string -> parse as JSON
-            output_json = json.loads(output[0]["generated_text"])
-            results.append({
-                "speaker": seg["speaker"],
-                "start": seg["start"],
-                "end": seg["end"],
-                "text": seg["text"],
-                "analysis": output_json
-            })
-        except Exception as e:
-            print(f"Error processing segment {seg}: {e}")
-            continue
+    # Load prompt text
+    with open(args.prompt, "r") as f:
+        prompt_text = f.read()
+
+    analyzer = SegmentAndAnalyze()
+    analyzer.setup()
+    result = analyzer.predict(audio=args.audio, prompt=prompt_text)
 
     # Save results
-    out_path = OUTPUT_DIR / f"{wav_path.stem}_analysis.json"
-    with open(out_path, "w") as f:
-        json.dump(results, f, indent=2)
-    print(f"Saved analysis to {out_path}")
+    output_path = f"{Path(args.audio).stem}_analysis.json"
+    with open(output_path, "w") as f:
+        f.write(result)
+    print(f"Saved analysis to {output_path}")
+
+
+if __name__ == "__main__":
+    main()
+

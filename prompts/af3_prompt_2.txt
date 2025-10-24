@@ -1,0 +1,32 @@
+You are an audio-language model. Listen carefully to the provided audio segment and analyze its emotional content. Return a **single JSON object** exactly in the format below.
+
+If the segment contains no speech or is neutral, return `"emotional_shift": "no"` and `"dominant_emotion": "neutral"`.
+
+Otherwise, detect emotional shifts and dominant emotion in the audio. Include optional transcript excerpts if relevant.
+
+JSON format:
+
+{
+  "emotional_shift": "<yes/no>",
+  "first_emotion": "<emotion_before_shift, if yes>",
+  "second_emotion": "<emotion_after_shift, if yes>",
+  "shift_time": <approximate_second_of_shift, if yes>,
+  "intensity_region": {
+    "start_time": <start_second>,
+    "end_time": <end_second>,
+    "span": "<excerpt_of_transcript>"
+  },
+  "expressive_marking": {
+    "tagged_transcript": "<transcript with [emote/]...[/emote] tags>"
+  },
+  "dominant_emotion": "<angry|happy|sad|neutral|disgust|fear|surprise>"
+}
+
+Transcript (if available):
+"<transcript text for this segment>"
+
+Important:
+- Return strictly valid JSON.
+- Include only fields relevant to the segment.
+- Keep output concise.
+
